@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SnakeRPG</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    body {
+      background: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #game {
+      border: 1px solid white;
+    }
+
+    #food-count {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      color: white;
+      font-size: 20px;
+    }
+
+    #game-over {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 2em;
+      color: white;
+      display: none;
+    }
+  </style>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+</head>
+<body>
+  <div id="food-count">Food: 0</div>
+  <div id="game-over">GAME OVER</div>
+  <div id="map"></div>
+  <script>
+    const config = {
+      type: Phaser.AUTO,
+      width: 400,
+      height: 400,
+      physics: {
+        default: 'arcade',
+      },
+      scene: {
+        preload: preload,
+        create: create,
+        update: update
+      }
+    };
+
+    window.game = new Phaser.Game(config);
+
+    const gameSettings = {
+      initialSnakeOrientation: 'horizontal' // or 'vertical'
+    };
+	const maptilesheet = 'maptilesheet.png';
+    const grid = 16;
+    let snake;
+    let apple;
+    let cursors;
+    let foodCount = 0;
+    let foodCountDiv;
+    let bunnies;
+    let lastBunnyTime = 0;
+
+function preload() {
+  this.load.image('apple', 'apple.png');
+  this.load.image('snakePart', 'snakePart.png');
+  this.load.image('snakeHead', 'snakeHead.png');
+  this.load.image('snakeTail', 'snakeTail.png');
+  this.load.image(maptilesheet, 'maptilesheet.png');
+  this.load.image('bunny', 'bunny.png');
+  this.load.tilemapTiledJSON('map', 'mapgrid.json');
+
+}
+
+function create() {
+  cursors = this.input.keyboard.createCursorKeys();
+
+  // Load the tilemap using the 'map' key specified in preload
+  const map = this.make.tilemap({ key: 'map' });
+
+  // Create a new tileset using the image key (imageName)
+  const tileset = map.addTilesetImage(maptilesheet, null, 32, 32, 0, 0, 0);
+
+  // Create layers using the tileset
+  const layer0 = map.createLayer(0, tileset);
+  // Set collision and callbacks for the layers
+  layer0.setCollisionByExclusion([-1], true);
+  layer0.setTileIndexCallback([0, 1, 2], killSnake, this);
+layer0.setTileLocationCallback(0, 0, 1, 1, spawnApple, this);
+
+  // Set world bounds and camera bounds
+  this.physics.world.setBounds(0, 0, 3200, 3200);
+  this.cameras.main.setBounds(0, 0, 3200, 3200);
+
+  // Create apple and bunnies
+  apple = this.add.image(320, 320, 'apple').setScale(0.1);
+  bunnies = this.add.group();
+
+  // Create the snake and load game data
+  loadGame.call(this, layer0); // Pass the layer as an argument
+  foodCountDiv = document.getElementById('food-count');
+
+  // Start camera follow if snake exists
+  if (snake && snake.parts && snake.parts.length > 0) {
+    this.cameras.main.startFollow(snake.parts[0], true);
+  }
+
+  // Schedule game data saving every 10 seconds
+  this.time.addEvent({
+    delay: 10000, // 10000 milliseconds = 10 seconds
+    callback: saveGame,
+    callbackScope: this,
+    loop: true
+  });
+}
+
+
+function loadGame(layer) {
+  let gameData = localStorage.getItem('gameData');
+  if (gameData) {
+    gameData = JSON.parse(gameData);
+
+    // Update the food count
+    foodCount = gameData.foodCount;
+    foodCountDiv = document.getElementById('food-count'); // Assign foodCountDiv correctly
+    foodCountDiv.innerText = 'Food: ' + foodCount;
+
+    // Update the apple's position
+    apple.setPosition(gameData.applePosition.x, gameData.applePosition.y);
+
+    // Update the snake's parts and directions
+    spawnSnake.call(this, gameData.snake.parts, gameData.snake.directions, layer);
+
+    // Update the camera target
+    this.cameras.main.startFollow(snake.parts[0], true);
+  } else {
+    // Create a new snake if no game data is found
+    spawnSnake.call(this, [], [], layer);
+    this.cameras.main.startFollow(snake.parts[0], true);
+  }
+}
+
+function spawnApple(tile) {
+  let appleX = tile.pixelX + tile.width / 2;
+  let appleY = tile.pixelY + tile.height / 2;
+  apple.setPosition(appleX, appleY);
+}
+
+function saveGame() {
+  let gameData = {
+    foodCount: foodCount,
+    applePosition: { x: apple.x, y: apple.y },
+    snake: {
+      parts: snake.parts.map(part => ({ x: part.x, y: part.y })),
+      directions: snake.directions.map(direction => ({ x: direction.x, y: direction.y })),
+    },
+  };
+
+  localStorage.setItem('gameData', JSON.stringify(gameData));
+}
+
+function spawnSnake(parts, directions, layer) {
+  if (snake) {
+    snake.body.clear(true, true);
+    snake.parts = [];
+    snake.directions = [];
+  } else {
+    snake = {};
+  }
+
+  snake.direction = Phaser.Math.Vector2.RIGHT;
+  snake.lastDirection = Phaser.Math.Vector2.RIGHT;
+  snake.body = this.add.group();
+  snake.headPosition = new Phaser.Geom.Point(160, 160);
+  snake.alive = true;
+  snake.speed = 100;
+  snake.moveTime = 0;
+  snake.tail = new Phaser.Geom.Point(160, 160);
+  snake.allowTurning = true;
+
+  if (parts && directions) {
+    snake.parts = parts.map(part => {
+      const snakePart = this.add.image(part.x, part.y, 'snakePart');
+      snakePart.setOrigin(0);
+      snakePart.setScale(0.1);
+      snake.body.add(snakePart);
+      return snakePart;
+    });
+
+    snake.directions = directions.map(direction => new Phaser.Math.Vector2(direction.x, direction.y));
+  } else {
+    if (gameSettings.initialSnakeOrientation === 'horizontal') {
+      for (let i = 0; i < 4; i++) {
+        let part;
+        if (i === 0) {
+          part = this.add.image(snake.headPosition.x, snake.headPosition.y + i * grid, 'snakeHead');
+        } else if (i === 3) {
+          part = this.add.image(snake.headPosition.x, snake.headPosition.y + i * grid, 'snakeTail');
+        } else {
+          part = this.add.image(snake.headPosition.x, snake.headPosition.y + i * grid, 'snakePart');
+        }
+        part.setOrigin(0);
+        part.setScale(0.1);
+        snake.body.add(part);
+        snake.parts.push(part);
+        snake.directions.push(snake.direction.clone());
+      }
+    } else {
+      for (let i = 0; i < 4; i++) {
+        let part;
+        if (i === 0) {
+          part = this.add.image(snake.headPosition.x + i * grid * 10, snake.headPosition.y, 'snakeHead');
+        } else if (i === 3) {
+          part = this.add.image(snake.headPosition.x + i * grid * 10, snake.headPosition.y, 'snakeTail');
+        } else {
+          part = this.add.image(snake.headPosition.x + i * grid * 10, snake.headPosition.y, 'snakePart');
+        }
+        part.setOrigin(0);
+        part.setScale(0.1);
+        snake.body.add(part);
+        snake.parts.push(part);
+        snake.directions.push(snake.direction.clone());
+      }
+    }
+  }
+
+  this.physics.add.collider(snake.parts[0], layer);
+}
+
+
+function update(time) {
+  if (!snake.alive) {
+    return;
+  }
+
+  if (time >= snake.moveTime) {
+    snake.lastDirection = snake.direction.clone();
+
+    if (cursors.left.isDown && snake.direction.x !== 1) {
+      snake.direction = new Phaser.Math.Vector2(-1, 0);
+    } else if (cursors.right.isDown && snake.direction.x !== -1) {
+      snake.direction = new Phaser.Math.Vector2(1, 0);
+    } else if (cursors.up.isDown && snake.direction.y !== 1) {
+	snake.direction = new Phaser.Math.Vector2(0, -1);
+} else if (cursors.down.isDown && snake.direction.y !== -1) {
+snake.direction = new Phaser.Math.Vector2(0, 1);
+}
+    if (!snake.lastDirection.equals(snake.direction)) {
+      let corner = this.add.image(snake.parts[1].x, snake.parts[1].y, 'snakeCorner').setScale(0.1).setOrigin(0);
+      corner.setAngle(snake.lastDirection.angle() * (180 / Math.PI));
+      snake.body.add(corner);
+      snake.parts[1].destroy();
+      snake.parts[1] = corner;
+    }
+
+    move.call(this, time);
+  }
+
+  if (Phaser.Geom.Intersects.RectangleToRectangle(snake.parts[0].getBounds(), apple.getBounds())) {
+    eatApple.call(this);
+    if (bunnies.children.size < 2 && time - lastBunnyTime > 5000) {
+      lastBunnyTime = time;
+      const bunny = this.add.image(
+        Phaser.Math.Between(0, config.width),
+        Phaser.Math.Between(0, config.height),
+        'bunny'
+      ).setScale(0.2);
+      bunnies.add(bunny);
+    }
+  }
+
+  for (const bunny of bunnies.children.entries) {
+    if (Phaser.Geom.Intersects.RectangleToRectangle(snake.parts[0].getBounds(), bunny.getBounds())) {
+      killSnake.call(this);
+      bunny.destroy();
+    }
+  }
+}
+
+function eatApple() {
+  foodCount++;
+  foodCountDiv.innerText = "Food: " + foodCount;
+
+  let newX = Phaser.Math.Between(0, config.width - grid);
+  let newY = Phaser.Math.Between(0, config.height - grid);
+  apple.setPosition(newX, newY);
+
+  let oldTailPosition = new Phaser.Geom.Point(snake.tail.x, snake.tail.y);
+
+  const newPart = this.add.image(oldTailPosition.x, oldTailPosition.y, 'snakePart');
+  newPart.setOrigin(0);
+  newPart.setScale(0.1);
+  snake.body.add(newPart);
+  snake.parts.splice(snake.parts.length - 1, 0, newPart);
+
+  snake.parts[snake.parts.length - 1].destroy();
+
+  const tail = this.add.image(oldTailPosition.x, oldTailPosition.y, 'snakeTail').setScale(0.1).setOrigin(0);
+  tail.setAngle(snake.directions[snake.directions.length - 2].angle() * (180 / Math.PI));
+  snake.body.add(tail);
+  snake.parts[snake.parts.length - 1] = tail;
+}
+
+function move(time) {
+  const oldTailPosition = { x: snake.parts[snake.parts.length - 1].x, y: snake.parts[snake.parts.length - 1].y };
+  const oldHeadPosition = new Phaser.Geom.Point(snake.headPosition.x, snake.headPosition.y);
+
+  snake.headPosition.x += snake.direction.x * grid;
+  snake.headPosition.y += snake.direction.y * grid;
+
+  // Move the head of the snake to the new position
+  snake.parts[0].x = snake.headPosition.x;
+  snake.parts[0].y = snake.headPosition.y;
+  snake.parts[0].setAngle(snake.direction.angle() * (180 / Math.PI));
+
+  // Shift all elements forward, discard the last one
+  for (let i = snake.parts.length - 1; i > 0; i--) {
+    snake.parts[i].x = snake.parts[i - 1].x; snake.parts[i].y = snake.parts[i - 1].y;
+}
+  snake.moveTime = time + snake.speed;
+  return true;
+}
+
+function killSnake() {
+  snake.alive = false;
+  snake.speed = 0;
+  foodCount = 0;
+  foodCountDiv.innerText = "Food: " + foodCount;
+  snake.parts.forEach(part => {
+    this.tweens.add({
+      targets: part,
+      alpha: { from: 1, to: 0 },
+      duration: 100,
+      yoyo: true,
+      repeat: 10
+    });
+  });
+
+  // Display 'Game Over'
+  let gameOver = document.getElementById('game-over');
+  gameOver.style.display = 'block';
+  let colors = ['red', 'orange', 'yellow', 'green', 'blue', 'indigo', 'violet'];
+  let i = 0;
+  let colorChangeInterval = setInterval(function() {
+    gameOver.style.color = colors[i];
+    i = (i + 1) % colors.length;
+  }, 250);
+
+  setTimeout(function() {
+    clearInterval(colorChangeInterval);
+    window.location.href = 'startscreen.html';
+  }, 2000);
+}
+  </script>
+</body>
+</html>
+   
+
+
+

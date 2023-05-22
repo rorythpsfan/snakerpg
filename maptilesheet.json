@@ -1,0 +1,14 @@
+{ "columns":3,
+ "image":"maptilesheet.png",
+ "imageheight":400,
+ "imagewidth":1200,
+ "margin":0,
+ "name":"maptilesheet",
+ "spacing":0,
+ "tilecount":3,
+ "tiledversion":"1.10.1",
+ "tileheight":400,
+ "tilewidth":400,
+ "type":"tileset",
+ "version":"1.10"
+}

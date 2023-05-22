@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Main Menu</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: black;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Press Start 2P', cursive;
+    }
+    #menu {
+      width: 400px;
+      height: 400px;
+      border: 1px solid white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      margin: 10px 0;
+    }
+    .selected {
+      color: lime;
+    }
+  </style>
+</head>
+<body>
+  <div id="menu">
+    <ul>
+      <li class="selected">Continue</li>
+      <li>New Game</li>
+      <li>Load Game</li>
+      <li>Settings</li>
+      <li>Exit Game</li>
+    </ul>
+  </div>
+  <script>
+    var menu = document.getElementById('menu');
+    var items = menu.getElementsByTagName('li');
+    var index = 0;
+
+    function updateMenu() {
+      for (var i = 0; i < items.length; i++) {
+        items[i].classList.remove('selected');
+      }
+      items[index].classList.add('selected');
+    }
+
+    function selectItem() {
+      var item = items[index].textContent;
+      if (item === 'New Game') {
+        window.location.href = "snakegame.html";
+      } else if (item === 'Continue') {
+        window.location.href = "snakegame.html?loadGame=true";
+      } else if (item === 'Settings') {
+        window.location.href = "Settings.html";
+      } else if (item === 'Exit Game') {
+        window.close();
+      }
+    }
+
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowDown') {
+        index = (index + 1) % items.length;
+        updateMenu();
+      } else if (e.key === 'ArrowUp') {
+        index = (index - 1 + items.length) % items.length;
+        updateMenu();
+      } else if (e.key === 'Enter') {
+        selectItem();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Start Screen</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    
+    body {
+      background: black;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-family: 'Press Start 2P', cursive;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      overflow: hidden;
+    }
+    button {
+      margin-top: 2em;
+      font-size: 1em;
+      padding: 0.5em 2em;
+    }
+  </style>
+</head>
+<body>
+  <h1>SnakeRPG</h1>
+  <p>Press Enter To Start</p>
+
+  <script>
+    function startGame() {
+      window.location.href = 'mainmenu.html'; 
+    }
+
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        startGame();
+      }
+    });
+  </script>
+</body>
+</html>
